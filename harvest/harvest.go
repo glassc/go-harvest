@@ -1,4 +1,5 @@
 package harvest
+
 import (
 	"encoding/json"
 	"fmt"
@@ -13,20 +14,43 @@ const (
 	mediaType = "application/json"
 )
 
+type service struct {
+	client *Client
+}
+
 type Client struct {
 	client   *http.Client
 	baseURL  *url.URL
+
+	Account *AccountService
 }
 
-func NewClient(httpClient *http.Client, account string) *Client {
+func NewClient(account string, httpClient *http.Client) *Client {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
 
 	baseUrl, _ := url.Parse(fmt.Sprintf(defaultBaseUrl, account))
 	c := &Client{client: httpClient, baseURL: baseUrl}
-  
+	c.Account = &AccountService{c}
 	return c
+}
+
+type BasicAuthTransport struct {
+	Username string
+	Password string
+}
+
+
+func (t *BasicAuthTransport) RoundTrip(req *http.Request) (*http.Response, error) {	
+	req.SetBasicAuth(t.Username, t.Password)
+	return http.DefaultTransport.RoundTrip(req)
+}
+
+// Client returns an *http.Client that makes requests that are authenticated
+// using HTTP Basic Authentication.
+func (t *BasicAuthTransport) Client() *http.Client {
+	return &http.Client{Transport: t}
 }
 
 
@@ -57,8 +81,8 @@ func (c *Client) newRequest(method string, action string, body interface{}) (*ht
 	return req, nil
 }
 
-func (c *Client) get(action string, body interface{}) (*http.Response, error) {
-	req, err := c.newRequest("GET", action, body)
+func (c *Client) get(action string) (*http.Response, error) {
+	req, err := c.newRequest("GET", action, nil)
 
 	if err != nil {
 		return nil, err
